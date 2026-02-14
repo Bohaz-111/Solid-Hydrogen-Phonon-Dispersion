@@ -1,5 +1,5 @@
 # Solid-Hydrogen-Phonon-Dispersion
-A simple program that calculates phonon dispersion of solid H2.
+A simple program that calculates phonon dispersion of solid H2. Can be easily modified for other materials. 
 
 Phonon_Dispersion.pdf succintly (only 2 pages!) covers the theory basics and some implementation detail.
 
