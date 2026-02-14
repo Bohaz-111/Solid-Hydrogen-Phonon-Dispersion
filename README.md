@@ -1,2 +1,11 @@
 # Solid-Hydrogen-Phonon-Dispersion
-A simple program that calculates phonon dispersion of solid H2 
+A simple program that calculates phonon dispersion of solid H2.
+
+Phonon_dispersion.pdf succintly (only 2 pages!) covers the theory basics and some implementation detail.
+
+The code sets up a HCP lattice then calculates the phonon frequency on a chosen path in the Brilluoin zone (which is a hexagonal prism for HCP). The code is quite modular, so you could 
+
+1. Change the lattice to CCP or any other lattices.
+2. Choose a different path in the Brillouin zone.
+
+(Although you have to do a bit of geometry to work them out, good luck and have fun.)
