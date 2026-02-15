@@ -6,23 +6,23 @@ program H2_disp_v2
    real(dp), parameter :: pi    = 3.14159265358979323846264338327950288419_dp
    
    ! Physical constants
-   real(dp), parameter :: kB_SI = 1.380649e-23_dp        ! J/K
-   real(dp), parameter :: hbar_SI = 1.054571817e-34_dp   ! J s
-   real(dp), parameter :: eV_to_J = 1.602176634e-19_dp   ! J/eV
-   real(dp), parameter :: amu_to_kg = 1.66054e-27_dp 
+   real(dp), parameter :: kB_SI       = 1.380649e-23_dp      ! J/K
+   real(dp), parameter :: hbar_SI     = 1.054571817e-34_dp   ! J s
+   real(dp), parameter :: eV_to_J     = 1.602176634e-19_dp   ! J/eV
+   real(dp), parameter :: amu_to_kg   = 1.66054e-27_dp 
    real(dp), parameter :: mass_H2_amu = 2.016_dp
-   real(dp), parameter :: mass_H2_kg = mass_H2_amu * amu_to_kg  
+   real(dp), parameter :: mass_H2_kg  = mass_H2_amu * amu_to_kg  
    
    ! Supercell parameters for phonon calculation
-   integer,  parameter :: nc = 7
-   integer,  parameter :: n_basis = 2                  ! 2 atoms per unit cell (HCP)
-   integer,  parameter :: n_unit = nc**3               ! Number of unit cells = 343
-   integer,  parameter :: n = n_unit * n_basis         ! Total atoms = 686 
+   integer,  parameter :: nc      = 7
+   integer,  parameter :: n_basis = 2                   ! 2 atoms per unit cell (HCP)
+   integer,  parameter :: n_unit  = nc**3               ! Number of unit cells = 343
+   integer,  parameter :: n       = n_unit * n_basis    ! Total atoms = 686 
    
    ! Lattice parameters (Angstrom)
    real(dp), parameter :: lattice_param = 3.79_dp      ! Lattice constant a
-   real(dp), parameter :: c_lat = 6.19_dp              ! c lattice parameter
-   real(dp), parameter :: disp_step = 0.0001_dp        ! Finite displacement epsilon
+   real(dp), parameter :: c_lat         = 6.19_dp      ! c lattice parameter
+   real(dp), parameter :: disp_step     = 0.0001_dp    ! Finite displacement epsilon
    
    real(dp), parameter :: sg_alpha  = 1.713_dp    
    real(dp), parameter :: sg_beta   = 2.9615_dp      ! In 1/Angstrom
@@ -34,10 +34,10 @@ program H2_disp_v2
    real(dp), parameter :: sg_C10    = 2617496.9_dp 
    real(dp), parameter :: cutoff    = 12.0_dp        ! Cutoff for intermolecular interaction
 
-   integer,  parameter :: n1_seg = 64                 ! Number of q points along path in reciprocal space
-   integer,  parameter :: n2_seg = 32
-   integer,  parameter :: n3_seg = 56
-   integer,  parameter :: n4_seg = 28 
+   integer,  parameter :: n1_seg   = 64                 ! Number of q points along path in reciprocal space
+   integer,  parameter :: n2_seg   = 32
+   integer,  parameter :: n3_seg   = 56
+   integer,  parameter :: n4_seg   = 28 
    integer,  parameter :: n_points = n1_seg + n2_seg + n3_seg + n4_seg
 
    real(dp)    :: r0(3,n)                            ! Equilibrium positions
@@ -346,16 +346,15 @@ contains
    subroutine force_vpimd(r, f)
       real(dp), intent(in)  :: r(:,:)
       real(dp), intent(out) :: f(:,:)
-      real(dp), parameter :: T_ref = 5.4_dp 
+      real(dp), parameter   :: T_ref = 5.4_dp 
       
       ! Persistent Data (Saved between calls)
       real(dp), allocatable, save :: coeffs(:,:) 
       real(dp), allocatable, save :: R_val(:)
       real(dp), save :: r_min, dr, dr_inv, r_cut_sq
       integer, save :: n_bins
-      logical, save :: initialized = .false.
+      logical, save :: initialised = .false.
 
-      ! Local Variables
       integer :: n_atoms, i, j, idx, unit_num, ios, n_lines
       real(dp) :: rij(3), r2, r_mag, delta, f_mag
       real(dp) :: c1, c2, c3
@@ -369,88 +368,87 @@ contains
       f = 0.0_dp
 
       ! ----------------------------------------------------------------
-      ! PART 1: INITIALIZATION (Executed only on the first call)
+      ! PART 1: INITIALISATION (Executed only on the first call)
       ! ----------------------------------------------------------------
-      if (.not. initialized) then
-          print *, '--- Initializing Potential from Vpimd.dat ---'
+      if (.not. initialised) then
+         print *, '--- Initialising Potential from Vpimd.dat ---'
           
-          unit_num = 10
-          open(unit=unit_num, file='Vpimd.dat', status='old', iostat=ios)
-          if (ios /= 0) stop 'Error: Could not open Vpimd.dat'
+         unit_num = 10
+         open(unit=unit_num, file='Vpimd.dat', status='old', iostat=ios)
+         if (ios /= 0) stop 'Error: Could not open Vpimd.dat'
 
-          ! 1. Count valid data lines
-          n_lines = 0
-          do
-             read(unit_num, '(A)', iostat=ios) line
-             if (ios /= 0) exit
-             if (len_trim(line) == 0 .or. line(1:1)=='#' .or. line(1:1)=='@') cycle
-             n_lines = n_lines + 1
-          end do
-          rewind(unit_num)
+         ! Count valid data lines
+         n_lines = 0
+         do
+            read(unit_num, '(A)', iostat=ios) line
+            if (ios /= 0) exit
+            if (len_trim(line) == 0 .or. line(1:1)=='#' .or. line(1:1)=='@') cycle
+            n_lines = n_lines + 1
+         end do
+         rewind(unit_num)
           
-          n_bins = n_lines - 1
-          allocate(R_val(0:n_bins), V_dat(0:n_bins))
-          allocate(V_d2(0:n_bins), u(0:n_bins))
-          allocate(coeffs(0:n_bins, 4))
+         n_bins = n_lines - 1
+         allocate(R_val(0:n_bins), V_dat(0:n_bins))
+         allocate(V_d2(0:n_bins), u(0:n_bins))
+         allocate(coeffs(0:n_bins, 4))
           
-          ! 2. Read Data and Convert Units
-          i = 0
-          do
-             read(unit_num, '(A)', iostat=ios) line
-             if (ios /= 0) exit
-             if (len_trim(line) == 0 .or. line(1:1)=='#' .or. line(1:1)=='@') cycle
+         ! Read data and convert units
+         i = 0
+         do
+            read(unit_num, '(A)', iostat=ios) line
+            if (ios /= 0) exit
+            if (len_trim(line) == 0 .or. line(1:1)=='#' .or. line(1:1)=='@') cycle ! Check for empty and non data lines
              
-             read(line, *) val_r, val_v
+            read(line, *) val_r, val_v
              
-             R_val(i) = val_r
-             V_dat(i) = val_v * T_ref ! Convert (kB*5.4K) -> Kelvin
+            R_val(i) = val_r
+            V_dat(i) = val_v * T_ref ! Convert (kB*5.4K) -> Kelvin
              
-             i = i + 1
-          end do
-          close(unit_num)
+            i = i + 1
+         end do
+         close(unit_num)
 
-          ! 3. Setup Grid Parameters
-          r_min = R_val(0)
-          dr = R_val(1) - R_val(0)
-          dr_inv = 1.0_dp / dr
-          r_cut_sq = R_val(n_bins)**2
+         r_min = R_val(0)
+         dr = R_val(1) - R_val(0)
+         dr_inv = 1.0_dp / dr
+         r_cut_sq = R_val(n_bins)**2
 
-          print *, '  R_min (A):', r_min
-          print *, '  dR (A):', dr
-          print *, '  R_cut (A):', sqrt(r_cut_sq)
+         print *, '  R_min (A):', r_min
+         print *, '  dR (A):', dr
+         print *, '  R_cut (A):', sqrt(r_cut_sq)
 
-          ! 4. Spline Construction (Natural Spline)
-          V_d2(0) = 0.0_dp; u(0) = 0.0_dp
+         ! Taken from numerical recipe page 109 for cubic spline
+         V_d2(0) = 0.0_dp; u(0) = 0.0_dp
           
-          do i = 1, n_bins-1
-             sig = 0.5_dp
-             p = sig * V_d2(i-1) + 2.0_dp
-             V_d2(i) = (sig - 1.0_dp) / p
-             u(i) = (V_dat(i+1) - V_dat(i)) / dr - &
-                    (V_dat(i) - V_dat(i-1)) / dr
-             u(i) = (6.0_dp * u(i) / (2.0_dp*dr) - sig*u(i-1)) / p
-          end do
+         do i = 1, n_bins-1
+            sig = 0.5_dp
+            p = sig * V_d2(i-1) + 2.0_dp
+            V_d2(i) = (sig - 1.0_dp) / p
+            u(i) = (V_dat(i+1) - V_dat(i)) / dr - &
+                   (V_dat(i) - V_dat(i-1)) / dr
+            u(i) = (6.0_dp * u(i) / (2.0_dp*dr) - sig*u(i-1)) / p
+         end do
           
-          V_d2(n_bins) = 0.0_dp
-          do i = n_bins-1, 0, -1
-             V_d2(i) = V_d2(i) * V_d2(i+1) + u(i)
-          end do
+         V_d2(n_bins) = 0.0_dp
+         do i = n_bins-1, 0, -1
+            V_d2(i) = V_d2(i) * V_d2(i+1) + u(i)
+         end do
           
-          ! 5. Calculate Spline Coefficients
-          h = dr
-          do i = 0, n_bins-1
-             ya = V_dat(i); yb = V_dat(i+1)
-             y2a = V_d2(i); y2b = V_d2(i+1)
+         ! Now we splint
+         h = dr
+         do i = 0, n_bins-1
+            ya = V_dat(i); yb = V_dat(i+1)
+            y2a = V_d2(i); y2b = V_d2(i+1)
              
-             coeffs(i, 1) = ya
-             coeffs(i, 2) = (yb-ya)/h - (h/6.0_dp)*(2.0_dp*y2a+y2b) 
-             coeffs(i, 3) = y2a / 2.0_dp
-             coeffs(i, 4) = (y2b-y2a) / (6.0_dp*h)
-          end do
-          coeffs(n_bins, :) = 0.0_dp 
+            coeffs(i, 1) = ya
+            coeffs(i, 2) = (yb-ya)/h - (h/6.0_dp)*(2.0_dp*y2a+y2b) 
+            coeffs(i, 3) = y2a / 2.0_dp
+            coeffs(i, 4) = (y2b-y2a) / (6.0_dp*h) ! See my second note for details
+         end do
+         coeffs(n_bins, :) = 0.0_dp 
           
-          deallocate(V_dat, V_d2, u)
-          initialized = .true.
+         deallocate(V_dat, V_d2, u)
+         initialised = .true.
       end if
 
       ! ----------------------------------------------------------------
@@ -460,7 +458,7 @@ contains
 
       do i = 1, n_atoms
          do j = i+1, n_atoms
-            rij = r(:,j) - r(:,i)
+            rij = r(:,j) - r(:,i) ! vector direction i -> j
             r2 = dot_product(rij, rij)
             
             if (r2 < r_cut_sq .and. r2 > 1.0e-8_dp) then
@@ -470,31 +468,34 @@ contains
                idx = int((r_mag - r_min) * dr_inv)
                
                if (idx >= 0 .and. idx < n_bins) then
-                   delta = r_mag - (r_min + real(idx, dp) * dr)
+                  delta = r_mag - (r_min + real(idx, dp) * dr)
                    
-                   c1 = coeffs(idx, 2)
-                   c2 = coeffs(idx, 3)
-                   c3 = coeffs(idx, 4)
+                  c1 = coeffs(idx, 2) ! Linear coefficient
+                  c2 = coeffs(idx, 3) ! Quadratic coefficient
+                  c3 = coeffs(idx, 4) ! Cubic coefficient
                    
-                   ! Force Magnitude F = dV/dr (applied along rij vector)
-                   ! Force on i = -grad_i V = -V' * grad_i r = -V' * (-rij/r) = V' * rij/r
-                   f_mag = (c1 + delta * (2.0_dp*c2 + delta * 3.0_dp*c3))
+                  ! Force Magnitude F = dV/dr (applied along rij vector)
+                  ! Force on i = -grad_i V = -V' * grad_i r = -V' * (-rij/r) = V' * rij/r
+                  f_mag = (c1 + delta * (2.0_dp*c2 + delta * 3.0_dp*c3))
                    
-                   ! Project to vector: F_vec = (F_mag / r) * r_vec
-                   f_mag = f_mag / r_mag
-                   rij = rij * f_mag
+                  ! F_vec = (F_mag / r) * r_vec
+                  f_mag = f_mag / r_mag
+                  rij = rij * f_mag
                    
-                   f(:,i) = f(:,i) + rij
-                   f(:,j) = f(:,j) - rij
+                  f(:,i) = f(:,i) + rij
+                  f(:,j) = f(:,j) - rij
                end if
             end if
          end do
       end do
-
-
    end subroutine force_vpimd
 
 end program H2_disp_v2
+
+
+
+
+
 
 
 
